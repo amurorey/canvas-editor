@@ -1350,7 +1350,10 @@ export class Draw {
       startY = 0,
       pageHeight = 0,
       mainOuterHeight = 0,
-      surroundElementList = []
+      surroundElementList = [],
+      startIndex,
+      endIndex,
+      prevRowList
     } = payload
     const {
       defaultSize,
@@ -2014,7 +2017,77 @@ export class Draw {
         x += metrics.width
       }
     }
-    return rowList
+    return this._mergeRowListIfNeeded({
+      rowList,
+      prevRowList,
+      startIndex,
+      endIndex,
+      elementCount: elementList.length
+    })
+  }
+
+  private _mergeRowListIfNeeded(payload: {
+    rowList: IRow[]
+    prevRowList?: IRow[]
+    startIndex?: number
+    endIndex?: number
+    elementCount: number
+  }) {
+    const { rowList, prevRowList, startIndex, endIndex, elementCount } = payload
+    if (
+      !prevRowList ||
+      startIndex === undefined ||
+      endIndex === undefined ||
+      startIndex > endIndex ||
+      elementCount !== endIndex - startIndex + 1
+    ) {
+      return rowList
+    }
+
+    const prefixRows: IRow[] = []
+    let prefixCursor = 0
+    while (prefixCursor < prevRowList.length) {
+      const row = prevRowList[prefixCursor]
+      const rowEndIndex = row.startIndex + row.elementList.length - 1
+      if (rowEndIndex < startIndex) {
+        prefixRows.push(this._cloneRow(row))
+        prefixCursor++
+      } else {
+        break
+      }
+    }
+
+    let suffixCursor = prevRowList.length
+    while (suffixCursor > prefixCursor) {
+      const row = prevRowList[suffixCursor - 1]
+      if (row.startIndex > endIndex) {
+        suffixCursor--
+      } else {
+        break
+      }
+    }
+
+    const suffixRows = prevRowList.slice(suffixCursor).map(row =>
+      this._cloneRow(row)
+    )
+    const middleRows = rowList.map(row => ({
+      ...row,
+      startIndex: row.startIndex + startIndex
+    }))
+    const mergedRows = [...prefixRows, ...middleRows, ...suffixRows].map(
+      (row, index) => ({
+        ...row,
+        rowIndex: index
+      })
+    )
+    return mergedRows
+  }
+
+  private _cloneRow(row: IRow): IRow {
+    return {
+      ...row,
+      elementList: row.elementList
+    }
   }
 
   private _computePageList(): IRow[][] {
@@ -2686,13 +2759,10 @@ export class Draw {
     const mainOuterHeight = this.getMainOuterHeight()
     const surroundElementList = pickSurroundElementList(this.elementList)
 
-    // 旧行数据切分
-    const preRows = this.rowList.filter(row => row.startIndex < pageStartIndex)
-    const postRows = this.rowList.filter(row => row.startIndex > pageEndIndex)
-
+    const previousRowList = this.rowList
     // 针对目标页重新计算行
     const segmentElementList = this.elementList.slice(pageStartIndex, pageEndIndex + 1)
-    const segmentRowList = this.computeRowList({
+    const mergedRows = this.computeRowList({
       startX: margins[3],
       startY: margins[0] + extraHeight,
       pageHeight,
@@ -2700,23 +2770,11 @@ export class Draw {
       isPagingMode,
       innerWidth,
       surroundElementList,
-      elementList: segmentElementList
+      elementList: segmentElementList,
+      startIndex: pageStartIndex,
+      endIndex: pageEndIndex,
+      prevRowList: previousRowList
     })
-
-    // 将 startIndex、rowIndex 校正回全局
-    const adjustRowList: IRow[] = segmentRowList.map((row, idx) => {
-      const adjustedRow: IRow = {
-        ...row,
-        startIndex: row.startIndex + pageStartIndex,
-        rowIndex: idx + preRows.length
-      }
-      return adjustedRow
-    })
-
-    // 合并新老行数据并重排 rowIndex
-    const mergedRows = [...preRows, ...adjustRowList, ...postRows].map(
-      (row, idx) => ({ ...row, rowIndex: idx })
-    )
 
     // 安全校验：行内元素总数必须与元素列表一致，否则回退全量计算
     const totalElementCount = mergedRows.reduce(
