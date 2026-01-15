@@ -12,6 +12,9 @@ export interface IDrawOption {
   isInit?: boolean
   isSourceHistory?: boolean
   isFirstRender?: boolean
+  // 供 render 推导影响范围使用
+  isAppend?: boolean
+  isDelete?: boolean
 }
 
 export interface IForceUpdateOption {

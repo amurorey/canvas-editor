@@ -2656,6 +2656,155 @@ export class Draw {
     }
   }
 
+
+  // 尝试基于单页重算的增量计算，成功则返回 true，否则回退全量
+  private _tryPartialCompute(payload: {
+    computeMode: 'full' | 'single-page' | 'segment'
+    targetPages?: number[]
+    innerWidth: number
+    isPagingMode: boolean
+  }): boolean {
+    const { computeMode, targetPages, innerWidth, isPagingMode } = payload
+    // 目前仅支持分页模式的单页增量；其他模式回退
+    if (!isPagingMode || computeMode !== 'single-page' || !targetPages?.length) {
+      return false
+    }
+    const targetPageNo = targetPages[0]
+    if (!this.pageRowList.length || !this.pageRowList[targetPageNo]?.length) {
+      return false
+    }
+    // 计算页切片的元素范围
+    const pageStartIndex = this.pageRowList[targetPageNo][0].startIndex
+    const nextPageFirstRow = this.pageRowList[targetPageNo + 1]?.[0]
+    const pageEndIndex =
+      (nextPageFirstRow ? nextPageFirstRow.startIndex : this.elementList.length) - 1
+    if (pageStartIndex < 0 || pageEndIndex < pageStartIndex) return false
+
+    const margins = this.getMargins()
+    const pageHeight = this.getHeight()
+    const extraHeight = this.header.getExtraHeight()
+    const mainOuterHeight = this.getMainOuterHeight()
+    const surroundElementList = pickSurroundElementList(this.elementList)
+
+    // 旧行数据切分
+    const preRows = this.rowList.filter(row => row.startIndex < pageStartIndex)
+    const postRows = this.rowList.filter(row => row.startIndex > pageEndIndex)
+
+    // 针对目标页重新计算行
+    const segmentElementList = this.elementList.slice(pageStartIndex, pageEndIndex + 1)
+    const segmentRowList = this.computeRowList({
+      startX: margins[3],
+      startY: margins[0] + extraHeight,
+      pageHeight,
+      mainOuterHeight,
+      isPagingMode,
+      innerWidth,
+      surroundElementList,
+      elementList: segmentElementList
+    })
+
+    // 将 startIndex、rowIndex 校正回全局
+    const adjustRowList: IRow[] = segmentRowList.map((row, idx) => {
+      const adjustedRow: IRow = {
+        ...row,
+        startIndex: row.startIndex + pageStartIndex,
+        rowIndex: idx + preRows.length
+      }
+      return adjustedRow
+    })
+
+    // 合并新老行数据并重排 rowIndex
+    const mergedRows = [...preRows, ...adjustRowList, ...postRows].map(
+      (row, idx) => ({ ...row, rowIndex: idx })
+    )
+
+    // 安全校验：行内元素总数必须与元素列表一致，否则回退全量计算
+    const totalElementCount = mergedRows.reduce(
+      (sum, row) => sum + row.elementList.length,
+      0
+    )
+    if (totalElementCount !== this.elementList.length) {
+      return false
+    }
+
+    this.rowList = mergedRows
+    // 重新分页、位置、区域等信息
+    this.pageRowList = this._computePageList()
+    this.position.computePositionList()
+    this.area.compute()
+    if (!this.isPrintMode()) {
+      const searchKeyword = this.search.getSearchKeyword()
+      if (searchKeyword) {
+        this.search.compute(searchKeyword)
+      }
+      this.control.computeHighlightList()
+    }
+    if (this.isGraffitiMode()) {
+      this.graffiti.compute()
+    }
+    return true
+  }
+  // 影响范围推导器：根据修改范围和上下文预判 computeRowList 的计算模式
+  private _inferComputeScope(payload: {
+    range: { startIndex: number; endIndex: number; pageNo?: number }
+    isAppend?: boolean
+    isDelete?: boolean
+    pageNo: number
+    pageCount: number
+  }): {
+    computeMode: 'full' | 'single-page' | 'segment'
+    targetPages?: number[]
+    affectedRange?: { start: number; end: number }
+  } {
+    const { range, isAppend, isDelete, pageNo, pageCount } = payload
+    const { startIndex, endIndex } = range
+    const isCollapsed = startIndex === endIndex
+    const isSinglePageDoc = pageCount <= 1
+    const isLastPage = pageNo === pageCount - 1
+
+    // 单页文档直接全量，避免分支判断开销
+    if (isSinglePageDoc) {
+      return {
+        computeMode: 'full',
+        targetPages: [0]
+      }
+    }
+
+    // 末页追加且不删除，优先仅计算末页（常见输入追加场景）
+    if (isAppend && !isDelete && isCollapsed && isLastPage) {
+      return {
+        computeMode: 'single-page',
+        targetPages: [pageNo]
+      }
+    }
+
+    // 已知页号且未删除，尝试局部页级计算
+    if (!isDelete && range.pageNo !== undefined) {
+      return {
+        computeMode: 'single-page',
+        targetPages: [range.pageNo]
+      }
+    }
+
+    // 小范围编辑（例如一行/一个段落），可回传片段范围以供后续增量实现
+    const maxSegmentSize = 2000
+    const span = endIndex - startIndex
+    if (!isDelete && span > 0 && span <= maxSegmentSize) {
+      return {
+        computeMode: 'segment',
+        affectedRange: {
+          start: Math.max(startIndex - 32, 0),
+          end: endIndex + 32
+        }
+      }
+    }
+
+    // 其他场景保持全量计算
+    return {
+      computeMode: 'full'
+    }
+  }
+
   public render(payload?: IDrawOption) {
     this.renderCount++
     const { header, footer } = this.options
@@ -2666,17 +2815,52 @@ export class Draw {
       isLazy = true,
       isInit = false,
       isSourceHistory = false,
-      isFirstRender = false
+      isFirstRender = false,
+      isAppend = false,
+      isDelete = false
     } = payload || {}
     let { curIndex } = payload || {}
     const innerWidth = this.getInnerWidth()
     const isPagingMode = this.getIsPagingMode()
     // 缓存当前页数信息
     const oldPageSize = this.pageRowList.length
+    const rangeState = this.range.getRange()
+    const cursorPosition = this.position.getCursorPosition()
+    const computeScope = this._inferComputeScope({
+      range: {
+        startIndex: rangeState.startIndex,
+        endIndex: rangeState.endIndex,
+        pageNo: cursorPosition?.pageNo
+      },
+      isAppend,
+      isDelete,
+      pageNo: cursorPosition?.pageNo ?? this.pageNo ?? 0,
+      pageCount: Math.max(oldPageSize, 1)
+    })
+    const computeMode = computeScope.computeMode
+    const shouldPartialCompute = computeMode === 'single-page' || computeMode === 'segment'
     // 计算文档信息
     if (isCompute) {
-      // 清空浮动元素位置信息
+      let didPartial = false
+      const positionContext = this.position.getPositionContext()
+      // 清空浮动元素位置信息（避免增量计算复用脏数据）
       this.position.setFloatPositionList([])
+      const allowPartialCompute =
+        shouldPartialCompute &&
+        !isInit &&
+        !isFirstRender &&
+        !isSourceHistory &&
+        !positionContext.isTable &&
+        this.zone.isMainActive()
+      if (allowPartialCompute) {
+        didPartial = this._tryPartialCompute({
+          computeMode,
+          targetPages: computeScope.targetPages,
+          innerWidth,
+          isPagingMode
+        })
+      }
+      if (!didPartial) {
       if (isPagingMode) {
         // 页眉信息
         if (!header.disabled) {
@@ -2723,6 +2907,7 @@ export class Draw {
       // 涂鸦信息
       if (this.isGraffitiMode()) {
         this.graffiti.compute()
+      }
       }
     }
     // 清除光标等副作用
