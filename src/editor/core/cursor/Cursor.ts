@@ -1,4 +1,4 @@
-import { nextTick } from 'process'
+import { nextTick } from '../../utils'
 import { CURSOR_AGENT_OFFSET_HEIGHT } from '../../dataset/constant/Cursor'
 import { EDITOR_PREFIX } from '../../dataset/constant/Editor'
 import { MoveDirection } from '../../dataset/enum/Observer'
