@@ -6,11 +6,28 @@ import {
 import { ElementType } from '../../../dataset/enum/Element'
 import { IElement } from '../../../interface/Element'
 import { IRangeElementStyle } from '../../../interface/Range'
-import { splitText } from '../../../utils'
+import { splitText, throttle } from '../../../utils'
 import { formatElementContext } from '../../../utils/element'
 import { CanvasEvent } from '../CanvasEvent'
 
+const inputExecutorMap = new WeakMap<CanvasEvent, (data: string) => void>()
+
+function getInputExecutor(host: CanvasEvent) {
+  let executor = inputExecutorMap.get(host)
+  if (!executor) {
+    // 节流输入，避免高频输入触发过多 render
+    executor = throttle((value: string) => executeInput(value, host), 16)
+    inputExecutorMap.set(host, executor)
+  }
+  return executor
+}
+
 export function input(data: string, host: CanvasEvent) {
+  const executor = getInputExecutor(host)
+  executor(data)
+}
+
+function executeInput(data: string, host: CanvasEvent) {
   const draw = host.getDraw()
   if (draw.isReadonly() || draw.isDisabled()) return
   const position = draw.getPosition()

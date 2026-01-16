@@ -3048,12 +3048,14 @@ export class Draw {
     isDelete?: boolean
     pageNo: number
     pageCount: number
+    hasPageBreak: boolean
   }): {
     computeMode: 'full' | 'single-page' | 'segment'
     targetPages?: number[]
     affectedRange?: { start: number; end: number }
   } {
-    const { range, isAppend, isDelete, pageNo, pageCount } = payload
+    const { range, isAppend, isDelete, pageNo, pageCount, hasPageBreak } =
+      payload
     const { startIndex, endIndex } = range
     const isCollapsed = startIndex === endIndex
     const isSinglePageDoc = pageCount <= 1
@@ -3068,7 +3070,7 @@ export class Draw {
     }
 
     // 末页追加且不删除，优先仅计算末页（常见输入追加场景）
-    if (isAppend && !isDelete && isCollapsed && isLastPage) {
+    if (isAppend && !isDelete && isCollapsed && isLastPage && !hasPageBreak) {
       return {
         computeMode: 'single-page',
         targetPages: [pageNo]
@@ -3132,7 +3134,10 @@ export class Draw {
       isAppend,
       isDelete,
       pageNo: cursorPosition?.pageNo ?? this.pageNo ?? 0,
-      pageCount: Math.max(oldPageSize, 1)
+      pageCount: Math.max(oldPageSize, 1),
+      hasPageBreak: this.elementList.some(
+        element => element.type === ElementType.PAGE_BREAK
+      )
     })
     const computeMode = computeScope.computeMode
     const shouldPartialCompute =
