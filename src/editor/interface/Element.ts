@@ -44,6 +44,10 @@ export interface IElementRule {
   hide?: boolean
 }
 
+export interface IElementRuntime {
+  __metricsVersion?: string
+}
+
 export interface IElementGroup {
   groupIds?: string[]
 }
@@ -154,6 +158,7 @@ export interface IAreaElement {
 export type IElement = IElementBasic &
   IElementStyle &
   IElementRule &
+  IElementRuntime &
   IElementGroup &
   ITable &
   IHyperlinkElement &

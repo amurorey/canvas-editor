@@ -193,6 +193,7 @@ export class Draw {
   private continuityPageHeightList: number[]
   private lastAppliedPageHeights: number[]
   private lastAppliedPageMode: PageMode | null
+  private elementMetricsCache: WeakMap<IElement, IElementMetrics>
 
   constructor(
     rootContainer: HTMLElement,
@@ -292,6 +293,7 @@ export class Draw {
     this.continuityPageHeightList = []
     this.lastAppliedPageHeights = []
     this.lastAppliedPageMode = null
+    this.elementMetricsCache = new WeakMap()
 
     // 打印模式优先设置打印数据
     if (this.mode === EditorMode.PRINT) {
@@ -507,8 +509,7 @@ export class Draw {
     ) {
       let offset = 0
       for (let i = 0; i < pageNo; i++) {
-        const height =
-          this.continuityPageHeightList[i] ?? this.getHeight()
+        const height = this.continuityPageHeightList[i] ?? this.getHeight()
         offset += height + gap
       }
       return offset
@@ -1375,6 +1376,15 @@ export class Draw {
     )
   }
 
+  private _getMetricsVersion(element: IElement, rowMargin: number): string {
+    const { defaultSize, defaultFont, scale } = this.options
+    const size = element.actualSize || element.size || defaultSize
+    const font = element.font || defaultFont
+    const letterSpacing = element.letterSpacing ?? 0
+    const content = element.value ?? ''
+    return [content, size, font, letterSpacing, rowMargin, scale].join('|')
+  }
+
   public computeRowList(payload: IComputeRowListPayload) {
     const {
       innerWidth,
@@ -1783,27 +1793,44 @@ export class Draw {
         ) {
           element.actualSize = Math.ceil(size * 0.6)
         }
-        metrics.height = (element.actualSize || size) * scale
+        const metricsVersion = this._getMetricsVersion(element, rowMargin)
         ctx.font = this.getElementFont(element)
-        const fontMetrics = this.textParticle.measureText(ctx, element)
-        metrics.width = fontMetrics.width * scale
-        if (element.letterSpacing) {
-          metrics.width += element.letterSpacing * scale
-        }
-        // 零宽字符ascent默认为：基线元素ascent
-        metrics.boundingBoxAscent =
-          (element.value === ZERO
-            ? this.textParticle.getBasisWordBoundingBoxAscent(
-                ctx,
-                element.font!
-              )
-            : fontMetrics.actualBoundingBoxAscent) * scale
-        metrics.boundingBoxDescent =
-          fontMetrics.actualBoundingBoxDescent * scale
-        if (element.type === ElementType.SUPERSCRIPT) {
-          metrics.boundingBoxAscent += metrics.height / 2
-        } else if (element.type === ElementType.SUBSCRIPT) {
-          metrics.boundingBoxDescent += metrics.height / 2
+        const cachedMetrics =
+          element.__metricsVersion === metricsVersion
+            ? this.elementMetricsCache.get(element)
+            : null
+        if (cachedMetrics) {
+          Object.assign(metrics, cachedMetrics)
+        } else {
+          const height = (element.actualSize || size) * scale
+          const fontMetrics = this.textParticle.measureText(ctx, element)
+          let width = fontMetrics.width * scale
+          if (element.letterSpacing) {
+            width += element.letterSpacing * scale
+          }
+          // 零宽字符ascent默认为：基线元素ascent
+          let boundingBoxAscent =
+            (element.value === ZERO
+              ? this.textParticle.getBasisWordBoundingBoxAscent(
+                  ctx,
+                  element.font!
+                )
+              : fontMetrics.actualBoundingBoxAscent) * scale
+          let boundingBoxDescent = fontMetrics.actualBoundingBoxDescent * scale
+          if (element.type === ElementType.SUPERSCRIPT) {
+            boundingBoxAscent += height / 2
+          } else if (element.type === ElementType.SUBSCRIPT) {
+            boundingBoxDescent += height / 2
+          }
+          const measuredMetrics: IElementMetrics = {
+            width,
+            height,
+            boundingBoxAscent,
+            boundingBoxDescent
+          }
+          Object.assign(metrics, measuredMetrics)
+          this.elementMetricsCache.set(element, measuredMetrics)
+          element.__metricsVersion = metricsVersion
         }
       }
       const ascent =
@@ -2127,8 +2154,7 @@ export class Draw {
       tablePosition.coordinate.leftTop[0] +
       (element.translateX || 0) * scale
     const startY =
-      (td.y! + tdPadding[0]) * scale +
-      tablePosition.coordinate.leftTop[1]
+      (td.y! + tdPadding[0]) * scale + tablePosition.coordinate.leftTop[1]
     this.position.computePageRowPosition({
       positionList: td.positionList,
       rowList: td.rowList,
@@ -2188,9 +2214,9 @@ export class Draw {
       }
     }
 
-    const suffixRows = prevRowList.slice(suffixCursor).map(row =>
-      this._cloneRow(row)
-    )
+    const suffixRows = prevRowList
+      .slice(suffixCursor)
+      .map(row => this._cloneRow(row))
     const middleRows = rowList.map(row => ({
       ...row,
       startIndex: row.startIndex + startIndex
@@ -2875,7 +2901,12 @@ export class Draw {
   private _applyContinuityPageHeights() {
     if (this.options.pageMode !== PageMode.CONTINUITY) return
     if (!this.continuityPageHeightList.length) return
-    if (this._isSamePageHeights(this.continuityPageHeightList, PageMode.CONTINUITY)) {
+    if (
+      this._isSamePageHeights(
+        this.continuityPageHeightList,
+        PageMode.CONTINUITY
+      )
+    ) {
       return
     }
     const dpr = this.getPagePixelRatio()
@@ -2889,7 +2920,10 @@ export class Draw {
       page.height = height * dpr
       this._initPageContext(ctx)
     }
-    this._setLastAppliedPageHeights(this.continuityPageHeightList, PageMode.CONTINUITY)
+    this._setLastAppliedPageHeights(
+      this.continuityPageHeightList,
+      PageMode.CONTINUITY
+    )
   }
 
   private _applyPagingPageHeights() {
@@ -2926,7 +2960,6 @@ export class Draw {
     this.lastAppliedPageMode = mode
   }
 
-
   // 尝试基于单页重算的增量计算，成功则返回 true，否则回退全量
   private _tryPartialCompute(payload: {
     computeMode: 'full' | 'single-page' | 'segment'
@@ -2936,7 +2969,11 @@ export class Draw {
   }): boolean {
     const { computeMode, targetPages, innerWidth, isPagingMode } = payload
     // 目前仅支持分页模式的单页增量；其他模式回退
-    if (!isPagingMode || computeMode !== 'single-page' || !targetPages?.length) {
+    if (
+      !isPagingMode ||
+      computeMode !== 'single-page' ||
+      !targetPages?.length
+    ) {
       return false
     }
     const targetPageNo = targetPages[0]
@@ -2947,7 +2984,9 @@ export class Draw {
     const pageStartIndex = this.pageRowList[targetPageNo][0].startIndex
     const nextPageFirstRow = this.pageRowList[targetPageNo + 1]?.[0]
     const pageEndIndex =
-      (nextPageFirstRow ? nextPageFirstRow.startIndex : this.elementList.length) - 1
+      (nextPageFirstRow
+        ? nextPageFirstRow.startIndex
+        : this.elementList.length) - 1
     if (pageStartIndex < 0 || pageEndIndex < pageStartIndex) return false
 
     const margins = this.getMargins()
@@ -2958,7 +2997,10 @@ export class Draw {
 
     const previousRowList = this.rowList
     // 针对目标页重新计算行
-    const segmentElementList = this.elementList.slice(pageStartIndex, pageEndIndex + 1)
+    const segmentElementList = this.elementList.slice(
+      pageStartIndex,
+      pageEndIndex + 1
+    )
     const mergedRows = this.computeRowList({
       startX: margins[3],
       startY: margins[0] + extraHeight,
@@ -3120,7 +3162,11 @@ export class Draw {
       if (!didPartial) {
         const positionContext = this.position.getPositionContext()
         let didTableCompute = false
-        if (!shouldForceFullCompute && positionContext.isTable && !isSourceHistory) {
+        if (
+          !shouldForceFullCompute &&
+          positionContext.isTable &&
+          !isSourceHistory
+        ) {
           const elementList = this.getOriginalElementList()
           const tableElement = elementList[positionContext.index!]
           if (tableElement?.type === ElementType.TABLE) {
