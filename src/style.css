@@ -1005,6 +1005,9 @@ ul {
   height: 16px;
   display: inline-block;
   cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }
 
 .footer .editor-option i {
@@ -1030,6 +1033,10 @@ ul {
 
 .footer .fullscreen.exist i {
   background-image: url('./assets/images/exit-fullscreen.svg');
+}
+
+.footer .grid-option i {
+  background-image: url('./assets/images/grid-line.svg');
 }
 
 .footer .paper-margin i {

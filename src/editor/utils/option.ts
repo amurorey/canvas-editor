@@ -17,6 +17,7 @@ import { defaultTitleOption } from '../dataset/constant/Title'
 import { defaultWatermarkOption } from '../dataset/constant/Watermark'
 import { defaultZoneOption } from '../dataset/constant/Zone'
 import { defaultLineNumberOption } from '../dataset/constant/LineNumber'
+import { defaultGridOption } from '../dataset/constant/Grid'
 import { IBackgroundOption } from '../interface/Background'
 import { ICheckboxOption } from '../interface/Checkbox'
 import { DeepRequired } from '../interface/Common'
@@ -39,6 +40,7 @@ import { IZoneOption } from '../interface/Zone'
 import { ILineNumberOption } from '../interface/LineNumber'
 import { IPageBorderOption } from '../interface/PageBorder'
 import { defaultPageBorderOption } from '../dataset/constant/PageBorder'
+import { IGridOption } from '../interface/Grid'
 import {
   EditorMode,
   PageMode,
@@ -126,6 +128,10 @@ export function mergeOption(
   const lineNumberOptions: Required<ILineNumberOption> = {
     ...defaultLineNumberOption,
     ...options.lineNumber
+  }
+  const gridOptions: Required<IGridOption> = {
+    ...defaultGridOption,
+    ...options.grid
   }
   const pageBorderOptions: Required<IPageBorderOption> = {
     ...defaultPageBorderOption,
@@ -218,6 +224,7 @@ export function mergeOption(
     lineBreak: lineBreakOptions,
     separator: separatorOptions,
     lineNumber: lineNumberOptions,
+    grid: gridOptions,
     pageBorder: pageBorderOptions,
     badge: badgeOptions,
     modeRule: modeRuleOption,

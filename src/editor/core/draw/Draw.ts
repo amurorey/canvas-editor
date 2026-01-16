@@ -114,6 +114,7 @@ import { TableOperate } from './particle/table/TableOperate'
 import { Area } from './interactive/Area'
 import { Badge } from './frame/Badge'
 import { Graffiti } from './graffiti/Graffiti'
+import { Grid } from './frame/Grid'
 
 export class Draw {
   private container: HTMLDivElement
@@ -178,6 +179,7 @@ export class Draw {
   private selectionObserver: SelectionObserver
   private imageObserver: ImageObserver
   private graffiti: Graffiti
+  private grid: Grid
 
   private LETTER_REG: RegExp
   private WORD_LIKE_REG: RegExp
@@ -261,6 +263,7 @@ export class Draw {
     this.control = new Control(this)
     this.pageBorder = new PageBorder(this)
     this.graffiti = new Graffiti(this, data.graffiti)
+    this.grid = new Grid(this)
 
     this.scrollObserver = new ScrollObserver(this)
     this.selectionObserver = new SelectionObserver(this)
@@ -1376,6 +1379,10 @@ export class Draw {
     )
   }
 
+  public getGridSpacing() {
+    return this.grid.getSpacing()
+  }
+
   private _getMetricsVersion(element: IElement, rowMargin: number): string {
     const { defaultSize, defaultFont, scale } = this.options
     const size = element.actualSize || element.size || defaultSize
@@ -1408,6 +1415,13 @@ export class Draw {
       defaultTabWidth
     } = this.options
     const defaultBasicRowMarginHeight = this.getDefaultBasicRowMarginHeight()
+    const gridOption = this.options.grid
+    const gridSpacing = this.getGridSpacing()
+    const isGridAlignEnabled =
+      !gridOption.disabled &&
+      gridOption.alignTextToGrid &&
+      !isFromTable &&
+      gridSpacing.verticalSpacing > 0
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
     // 计算列表偏移宽度
@@ -1991,6 +2005,10 @@ export class Draw {
           element.areaId !== elementList[i - 1]?.areaId
             ? element.area.top * scale
             : 0
+        if (isGridAlignEnabled && row.height < gridSpacing.verticalSpacing) {
+          row.height = gridSpacing.verticalSpacing
+          row.ascent = Math.max(row.ascent, row.height - rowMargin)
+        }
         rowList.push(row)
       } else {
         curRow.width += metrics.width
@@ -2004,6 +2022,13 @@ export class Draw {
         } else if (curRow.height < height) {
           curRow.height = height
           curRow.ascent = ascent
+        }
+        if (
+          isGridAlignEnabled &&
+          curRow.height < gridSpacing.verticalSpacing
+        ) {
+          curRow.height = gridSpacing.verticalSpacing
+          curRow.ascent = Math.max(curRow.ascent, curRow.height - rowMargin)
         }
         curRow.elementList.push(rowElement)
       }
@@ -2046,7 +2071,19 @@ export class Draw {
       // 重新计算坐标、页码、下一行首行元素环绕交叉
       if (isWrap) {
         x = startX
-        y += curRow.height
+        let nextY = y + curRow.height
+        if (isGridAlignEnabled && gridSpacing.verticalSpacing) {
+          const gridBaseY = startY
+          const spacing = gridSpacing.verticalSpacing
+          const relative = nextY - gridBaseY
+          if (relative > 0) {
+            const snappedY =
+              gridBaseY + Math.ceil(relative / spacing) * spacing
+            curRow.height = snappedY - y
+            nextY = snappedY
+          }
+        }
+        y = nextY
         if (
           isPagingMode &&
           !isFromTable &&
@@ -2796,6 +2833,8 @@ export class Draw {
     if (!isPrintMode) {
       this.margin.render(ctx, pageNo)
     }
+    // 绘制网格线
+    this.grid.render(ctx)
     // 渲染衬于文字下方元素
     this._drawFloat(ctx, {
       pageNo,

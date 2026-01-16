@@ -22,6 +22,7 @@ import Editor, {
   TitleLevel,
   splitText
 } from './editor'
+import { defaultGridOption } from './editor/dataset/constant/Grid'
 import { Dialog } from './components/dialog/Dialog'
 import { formatPrismToken } from './utils/prism'
 import { Signature } from './components/signature/Signature'
@@ -1253,6 +1254,179 @@ window.onload = function () {
   // 6. 目录显隐 | 页面模式 | 纸张缩放 | 纸张大小 | 纸张方向 | 页边距 | 全屏 | 设置
   const editorOptionDom =
     document.querySelector<HTMLDivElement>('.editor-option')!
+  const gridOptionDom = document.querySelector<HTMLDivElement>('.grid-option')!
+  gridOptionDom.onclick = function () {
+    const currentGrid = {
+      ...defaultGridOption,
+      ...instance.command.getOptions().grid
+    }
+    new Dialog({
+      title: '网格线设置',
+      data: [
+        {
+          type: 'select',
+          label: '启用网格线',
+          name: 'disabled',
+          required: true,
+          value: currentGrid.disabled ? '0' : '1',
+          options: [
+            { label: '开启', value: '1' },
+            { label: '禁用', value: '0' }
+          ]
+        },
+        {
+          type: 'select',
+          label: '显示网格线',
+          name: 'show',
+          required: true,
+          value: currentGrid.show ? '1' : '0',
+          options: [
+            { label: '显示', value: '1' },
+            { label: '隐藏', value: '0' }
+          ]
+        },
+        {
+          type: 'select',
+          label: '显示垂直线',
+          name: 'showVertical',
+          required: true,
+          value: currentGrid.showVertical ? '1' : '0',
+          options: [
+            { label: '显示', value: '1' },
+            { label: '隐藏', value: '0' }
+          ]
+        },
+        {
+          type: 'select',
+          label: '显示水平线',
+          name: 'showHorizontal',
+          required: true,
+          value: currentGrid.showHorizontal ? '1' : '0',
+          options: [
+            { label: '显示', value: '1' },
+            { label: '隐藏', value: '0' }
+          ]
+        },
+        {
+          type: 'number',
+          label: '水平间距',
+          name: 'horizontalSpacing',
+          required: true,
+          value: String(currentGrid.horizontalSpacing)
+        },
+        {
+          type: 'number',
+          label: '垂直间距',
+          name: 'verticalSpacing',
+          required: true,
+          value: String(currentGrid.verticalSpacing)
+        },
+        {
+          type: 'number',
+          label: '每页网格数',
+          name: 'linesPerPage',
+          required: true,
+          value: String(currentGrid.linesPerPage)
+        },
+        {
+          type: 'select',
+          label: '吸附启用',
+          name: 'snapEnabled',
+          required: true,
+          value: currentGrid.snapEnabled ? '1' : '0',
+          options: [
+            { label: '开启', value: '1' },
+            { label: '关闭', value: '0' }
+          ]
+        },
+        {
+          type: 'number',
+          label: '吸附阈值',
+          name: 'snapThreshold',
+          required: true,
+          value: String(currentGrid.snapThreshold)
+        },
+        {
+          type: 'color',
+          label: '网格颜色',
+          name: 'color',
+          required: true,
+          value: currentGrid.color
+        },
+        {
+          type: 'number',
+          label: '线宽',
+          name: 'lineWidth',
+          required: true,
+          value: String(currentGrid.lineWidth)
+        },
+        {
+          type: 'number',
+          label: '透明度(0-1)',
+          name: 'alpha',
+          required: true,
+          value: String(currentGrid.alpha)
+        },
+        {
+          type: 'select',
+          label: '文本对齐网格',
+          name: 'alignTextToGrid',
+          required: true,
+          value: currentGrid.alignTextToGrid ? '1' : '0',
+          options: [
+            { label: '是', value: '1' },
+            { label: '否', value: '0' }
+          ]
+        }
+      ],
+      onConfirm: payload => {
+        const getValue = (name: string) => payload.find(p => p.name === name)?.value
+        const getNumber = (name: string) => {
+          const raw = getValue(name)
+          const num = Number(raw)
+          return Number.isNaN(num) ? null : num
+        }
+
+        const horizontalSpacing = getNumber('horizontalSpacing')
+        const verticalSpacing = getNumber('verticalSpacing')
+        const linesPerPage = getNumber('linesPerPage')
+        const snapThreshold = getNumber('snapThreshold')
+        const lineWidth = getNumber('lineWidth')
+        const alpha = getNumber('alpha')
+        const color = getValue('color')
+
+        if (
+          horizontalSpacing === null ||
+          verticalSpacing === null ||
+          linesPerPage === null ||
+          snapThreshold === null ||
+          lineWidth === null ||
+          alpha === null ||
+          !color
+        ) {
+          return
+        }
+
+        instance.command.executeUpdateOptions({
+          grid: {
+            disabled: getValue('disabled') === '0',
+            show: getValue('show') === '1',
+            showVertical: getValue('showVertical') === '1',
+            showHorizontal: getValue('showHorizontal') === '1',
+            horizontalSpacing,
+            verticalSpacing,
+            linesPerPage,
+            snapEnabled: getValue('snapEnabled') === '1',
+            snapThreshold,
+            color,
+            lineWidth,
+            alpha,
+            alignTextToGrid: getValue('alignTextToGrid') === '1'
+          }
+        })
+      }
+    })
+  }
   editorOptionDom.onclick = function () {
     const options = instance.command.getOptions()
     new Dialog({

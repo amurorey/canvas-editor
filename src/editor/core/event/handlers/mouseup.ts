@@ -42,6 +42,31 @@ function moveImgPosition(
       y: imgFloatPosition.y + moveY,
       pageNo: draw.getPageNo()
     }
+    const { grid } = draw.getOptions()
+    if (!grid.disabled && grid.snapEnabled) {
+      const spacing = draw.getGridSpacing()
+      const threshold = (grid.snapThreshold ?? 0) * draw.getOptions().scale
+      const { originX, originY, horizontalSpacing, verticalSpacing } = spacing
+      const pos = element.imgFloatPosition
+      if (horizontalSpacing && verticalSpacing && pos) {
+        const snapX =
+          originX +
+          Math.round((pos.x - originX) / horizontalSpacing) * horizontalSpacing
+        const snapY =
+          originY +
+          Math.round((pos.y - originY) / verticalSpacing) * verticalSpacing
+        const deltaX = Math.abs(snapX - pos.x)
+        const deltaY = Math.abs(snapY - pos.y)
+        if (Math.max(deltaX, deltaY) <= threshold) {
+          pos.x = snapX
+          pos.y = snapY
+        } else if (deltaX <= threshold) {
+          pos.x = snapX
+        } else if (deltaY <= threshold) {
+          pos.y = snapY
+        }
+      }
+    }
   }
   draw.getImageParticle().destroyFloatImage()
 }

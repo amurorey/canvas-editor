@@ -30,6 +30,7 @@ import { IElement } from './Element'
 import { LocationPosition } from '../dataset/enum/Common'
 import { IRange } from './Range'
 import { IGraffitiData, IGraffitiOption } from './Graffiti'
+import { IGridOption } from './Grid'
 
 export interface IEditorData {
   header?: IElement[]
@@ -105,6 +106,7 @@ export interface IEditorOption {
   badge?: IBadgeOption
   modeRule?: IModeRule
   graffiti?: IGraffitiOption
+  grid?: IGridOption
 }
 
 export interface IEditorResult {
