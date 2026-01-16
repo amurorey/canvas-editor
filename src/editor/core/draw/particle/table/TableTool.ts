@@ -103,9 +103,7 @@ export class TableTool {
     const {
       coordinate: { leftTop }
     } = position
-    const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
-    const prePageHeight = this.draw.getPageNo() * (height + pageGap)
+    const prePageHeight = this.draw.getPageOffsetY(this.draw.getPageNo())
     const tableX = leftTop[0]
     const tableY = leftTop[1] + prePageHeight
     const td = element.trList![trIndex!].tdList[tdIndex!]
@@ -392,8 +390,7 @@ export class TableTool {
     } = this.options
     const width = this.draw.getWidth()
     const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
-    const prePageHeight = this.draw.getPageNo() * (height + pageGap)
+    const prePageHeight = this.draw.getPageOffsetY(this.draw.getPageNo())
     this.mousedownX = evt.x
     this.mousedownY = evt.y
     const target = evt.target as HTMLDivElement

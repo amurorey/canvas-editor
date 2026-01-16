@@ -86,10 +86,8 @@ export class Previewer {
     const { scale } = this.options
     let x = 0
     let y = 0
-    const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
     const pageNo = position?.pageNo ?? this.draw.getPageNo()
-    const preY = pageNo * (height + pageGap)
+    const preY = this.draw.getPageOffsetY(pageNo)
     // 优先使用浮动位置
     if (element.imgFloatPosition) {
       x = element.imgFloatPosition.x! * scale

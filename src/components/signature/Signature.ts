@@ -50,7 +50,9 @@ export class Signature {
     this.trashContainer = trashContainer
     this.undoContainer = undoContainer
     this.canvas = canvas
-    this.ctx = <CanvasRenderingContext2D>canvas.getContext('2d')
+    this.ctx = <CanvasRenderingContext2D>canvas.getContext('2d', {
+      willReadFrequently: true
+    })
     this.ctx.scale(this.dpr, this.dpr)
     this.ctx.lineCap = 'round'
     this._bindEvent()
@@ -299,7 +301,9 @@ export class Signature {
     canvas.style.height = `${sh}px`
     canvas.width = sw * this.dpr
     canvas.height = sh * this.dpr
-    const ctx = <CanvasRenderingContext2D>canvas.getContext('2d')!
+    const ctx = <CanvasRenderingContext2D>canvas.getContext('2d', {
+      willReadFrequently: true
+    })!
     ctx.putImageData(imageData, 0, 0)
     const value = canvas.toDataURL()
     return {

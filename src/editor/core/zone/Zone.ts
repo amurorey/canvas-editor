@@ -108,8 +108,6 @@ export class Zone {
     const margins = this.draw.getMargins()
     const innerWidth = this.draw.getInnerWidth()
     const pageHeight = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
-    const preY = pageHeight + pageGap
     // 创建指示器容器
     this.indicatorContainer = document.createElement('div')
     this.indicatorContainer.classList.add(`${EDITOR_PREFIX}-zone-indicator`)
@@ -123,7 +121,7 @@ export class Zone {
       ? header.getHeaderTop()
       : pageHeight - footer.getFooterBottom() - indicatorHeight
     for (let p = 0; p < pageList.length; p++) {
-      const startY = preY * p + indicatorTop
+      const startY = this.draw.getPageOffsetY(p) + indicatorTop
       const indicatorLeftX = margins[3] - this.INDICATOR_PADDING
       const indicatorRightX = margins[3] + innerWidth + this.INDICATOR_PADDING
       const indicatorTopY = isHeaderActive

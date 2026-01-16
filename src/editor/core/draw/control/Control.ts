@@ -373,10 +373,8 @@ export class Control {
   }
 
   public getPreY(): number {
-    const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
     const pageNo = this.getPosition()?.pageNo ?? this.draw.getPageNo()
-    return pageNo * (height + pageGap)
+    return this.draw.getPageOffsetY(pageNo)
   }
 
   public getRange(): IRange {

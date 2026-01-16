@@ -261,9 +261,7 @@ export class BaseBlock {
   }
 
   public setClientRects(pageNo: number, x: number, y: number) {
-    const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
-    const preY = pageNo * (height + pageGap)
+    const preY = this.draw.getPageOffsetY(pageNo)
     // 尺寸
     const { metrics } = this.element
     this.blockItem.style.display = 'block'

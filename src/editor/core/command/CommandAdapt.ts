@@ -263,15 +263,15 @@ export class CommandAdapt {
       const tableElement = elementList[tableElementIndex]
       const tr = tableElement.trList![startTrIndex!]
       const td = tr.tdList[startTdIndex!]
-      this.position.setPositionContext({
-        isTable: true,
-        index: tableElementIndex,
-        trIndex: startTrIndex,
-        tdIndex: startTdIndex,
-        tdId: td.id,
-        trId: tr.id,
-        tableId
-      })
+        this.position.setPositionContext({
+          isTable: true,
+          index: tableElementIndex,
+          trIndex: startTrIndex,
+          tdIndex: startTdIndex,
+          tdId: td.id,
+          trId: tr.id,
+          tableId
+        })
     } else {
       this.position.setPositionContext({
         isTable: false
@@ -1528,8 +1528,6 @@ export class CommandAdapt {
 
     // 坐标信息（相对编辑器书写区）
     const rangeRects: RangeRect[] = []
-    const height = this.draw.getOriginalHeight()
-    const pageGap = this.draw.getOriginalPageGap()
     const selectionPositionList = this.position.getSelectionPositionList()
     if (selectionPositionList) {
       // 起始信息及x坐标
@@ -1550,7 +1548,7 @@ export class CommandAdapt {
           }
           rangeRect = {
             x: leftTop[0],
-            y: leftTop[1] + pageNo * (height + pageGap),
+            y: leftTop[1] + this.draw.getPageOffsetY(pageNo),
             width: rightTop[0] - leftTop[0],
             height: lineHeight
           }
@@ -1574,7 +1572,7 @@ export class CommandAdapt {
       } = position
       rangeRects.push({
         x: rightTop[0],
-        y: rightTop[1] + pageNo * (height + pageGap),
+        y: rightTop[1] + this.draw.getPageOffsetY(pageNo),
         width: 0,
         height: lineHeight
       })
@@ -2505,11 +2503,9 @@ export class CommandAdapt {
         coordinate: { leftTop, rightTop },
         lineHeight
       } = position
-      const height = this.draw.getOriginalHeight()
-      const pageGap = this.draw.getOriginalPageGap()
       rangeRect = {
         x: leftTop[0],
-        y: leftTop[1] + pageNo * (height + pageGap),
+        y: leftTop[1] + this.draw.getPageOffsetY(pageNo),
         width: rightTop[0] - leftTop[0],
         height: lineHeight
       }

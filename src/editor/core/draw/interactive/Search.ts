@@ -110,9 +110,7 @@ export class Search {
       coordinate: { leftTop, leftBottom, rightTop },
       pageNo
     } = position
-    const height = this.draw.getHeight()
-    const pageGap = this.draw.getPageGap()
-    const preY = pageNo * (height + pageGap)
+    const preY = this.draw.getPageOffsetY(pageNo)
     // 创建定位锚点
     const anchor = document.createElement('div')
     anchor.style.position = 'absolute'
